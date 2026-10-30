@@ -167,6 +167,10 @@ with right:
         else:
             for r in results["results"]:
                 render_result(r)
-            st.caption(f"Full details saved to: {results['output_json']}")
+            # output_json is a path on the server's own disk -- useless to the clinician as
+            # text, so offer its contents as an actual download instead of just naming it.
+            with open(results["output_json"], "rb") as f:
+                st.download_button("⬇ Download full result (JSON)", f.read(),
+                                    file_name=Path(results["output_json"]).name, mime="application/json")
     else:
         st.info("Pick a participant and scene, enter an instruction, and click **Run analysis**.")
