@@ -7,3 +7,8 @@ matplotlib
 opencv-python-headless
 ultralytics
 twelvelabs
+# YOLO-World's open-vocab text encoder (model.set_classes()) imports this at call time --
+# not pulled in by plain `pip install ultralytics`, so without it any target not in our
+# known closed-vocab classes (i.e. most uploaded-video instructions) fails with
+# ModuleNotFoundError deep inside ultralytics/nn/text_model.py.
+git+https://github.com/openai/CLIP.git
