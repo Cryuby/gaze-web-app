@@ -1,3 +1,10 @@
+# Plain PyPI torch pulls the CUDA build (multi-GB of nvidia-* packages) even though this
+# free container has no GPU -- forces the CPU-only build instead, which is a fraction of
+# the size/RAM footprint and was almost certainly what crashed the app under load.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+
 streamlit
 pandas
 numpy
