@@ -1,0 +1,16 @@
+[theme]
+primaryColor = "#4F6BED"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F5FB"
+textColor = "#1A1D29"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# Streamlit's own default is 200MB. Raised, but kept well under the local desktop
+# version's 8000MB -- this free-tier cloud container has limited RAM/disk, so a
+# multi-GB upload is likely to fail or time out here even with the cap raised.
+# Clinicians should trim/compress long videos before uploading.
+maxUploadSize = 1000
