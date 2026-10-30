@@ -131,7 +131,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500&display=swap');
 
 .stApp { background: #FBFBFA; }
-.block-container { max-width: 1040px; padding-top: 2.4rem; }
+.block-container { max-width: 760px; padding-top: 2.4rem; }
 [data-testid="stAppViewContainer"] h1 {
     font-family: 'Newsreader', serif;
     font-weight: 600;
@@ -179,74 +179,79 @@ st.markdown(
 scenes = available_scenes()
 has_known_data = bool(scenes)
 
-left, right = st.columns([1, 1.4], gap="large")
-
-with left:
-    with st.container(border=True):
-        st.markdown('<div class="step-heading"><span class="num">1</span>Choose what to analyze</div>',
-                    unsafe_allow_html=True)
-        if has_known_data:
-            source_mode = st.radio("Video + gaze data source", ["Use a known example", "Upload your own files"],
-                                    horizontal=True, label_visibility="collapsed")
-        else:
-            source_mode = "Upload your own files"
-            st.caption("No bundled example data found on this machine -- upload your own video + gaze CSV below.")
-
-        video_path, gaze_path, scene = None, None, None
-        if source_mode == "Use a known example":
-            participant_label = st.selectbox("Participant", list(PARTICIPANTS.keys()))
-            scene = st.selectbox("Scene", scenes, index=scenes.index("2.1.C") if "2.1.C" in scenes else 0)
-            video_path, gaze_path = SCENE_DIR / f"{scene}.mp4", PARTICIPANTS[participant_label]
-        else:
-            video_upload = st.file_uploader("Scene video", type=["mp4", "mov", "avi", "mkv"])
-            gaze_upload = st.file_uploader("Gaze CSV", type=["csv"])
-            if video_upload is not None:
-                video_path = save_upload(video_upload)
-            if gaze_upload is not None:
-                gaze_path = save_upload(gaze_upload)
-                detected_scenes = sorted(load_gaze(gaze_path)["scene"].dropna().unique())
-                if detected_scenes:
-                    scene = st.selectbox("Scene (detected from your gaze file)", detected_scenes)
-                else:
-                    st.warning("Couldn't detect a scene name in this gaze file's 'filename' column.")
-
-        st.markdown('<div class="step-heading"><span class="num">2</span>What do you want to know?</div>',
-                    unsafe_allow_html=True)
-
-        if "instruction_text" not in st.session_state:
-            st.session_state.instruction_text = EXAMPLE_INSTRUCTION
-        st.caption("Try an example, or write your own below:")
-        chip_cols = st.columns(3)
-        for col, (label, text) in zip(chip_cols, [
-            ("% looking at people", "what percent of time did they look at people"),
-            ("Heatmap of gaze", "give me a heatmap of where they looked"),
-            ("When they looked", "when did they look at the table, give me timestamps"),
-        ]):
-            if col.button(label, width="stretch", key=f"chip_{label}"):
-                st.session_state.instruction_text = text
-
-        instruction = st.text_area("Instruction", key="instruction_text", height=90,
-                                    help="Say what to pay attention to (e.g. 'look at the window') and what "
-                                         "output you want (percent, heatmap, how many times, how fast).")
-        ready = video_path is not None and gaze_path is not None and scene is not None
-        run_clicked = st.button("Run analysis", type="primary", width="stretch", disabled=not ready)
-        if not ready and source_mode == "Upload your own files":
-            st.caption("Upload both a video and a gaze CSV to continue.")
-
-with right:
-    st.subheader("Result")
-    if run_clicked:
-        with st.spinner("Analyzing..."):
-            results = run_analysis(str(video_path), str(gaze_path), scene, instruction)
-        if "error" in results:
-            st.error(results["error"])
-        else:
-            for r in results["results"]:
-                render_result(r)
-            # output_json is a path on the server's own disk -- useless to the clinician as
-            # text, so offer its contents as an actual download instead of just naming it.
-            with open(results["output_json"], "rb") as f:
-                st.download_button("Download full result (JSON)", f.read(),
-                                    file_name=Path(results["output_json"]).name, mime="application/json")
+# Single-column, top-to-bottom flow instead of a left/right split: this is a linear
+# wizard (upload -> describe -> run -> read result), not a dashboard with two things to
+# watch at once, so a left/right split just left the result side empty during setup and
+# squeezed the instruction chips into a column too narrow for their own labels.
+with st.container(border=True):
+    st.markdown('<div class="step-heading"><span class="num">1</span>Choose what to analyze</div>',
+                unsafe_allow_html=True)
+    if has_known_data:
+        source_mode = st.radio("Video + gaze data source", ["Use a known example", "Upload your own files"],
+                                horizontal=True, label_visibility="collapsed")
     else:
-        st.info("Upload a video and gaze file, describe what you want to know, and click **Run analysis**.")
+        source_mode = "Upload your own files"
+        st.caption("No bundled example data found on this machine -- upload your own video + gaze CSV below.")
+
+    video_path, gaze_path, scene = None, None, None
+    if source_mode == "Use a known example":
+        participant_label = st.selectbox("Participant", list(PARTICIPANTS.keys()))
+        scene = st.selectbox("Scene", scenes, index=scenes.index("2.1.C") if "2.1.C" in scenes else 0)
+        video_path, gaze_path = SCENE_DIR / f"{scene}.mp4", PARTICIPANTS[participant_label]
+    else:
+        upload_cols = st.columns(2)
+        video_upload = upload_cols[0].file_uploader("Scene video", type=["mp4", "mov", "avi", "mkv"])
+        gaze_upload = upload_cols[1].file_uploader("Gaze CSV", type=["csv"])
+        if video_upload is not None:
+            video_path = save_upload(video_upload)
+        if gaze_upload is not None:
+            gaze_path = save_upload(gaze_upload)
+            detected_scenes = sorted(load_gaze(gaze_path)["scene"].dropna().unique())
+            if detected_scenes:
+                scene = st.selectbox("Scene (detected from your gaze file)", detected_scenes)
+            else:
+                st.warning("Couldn't detect a scene name in this gaze file's 'filename' column.")
+
+st.write("")
+
+with st.container(border=True):
+    st.markdown('<div class="step-heading"><span class="num">2</span>What do you want to know?</div>',
+                unsafe_allow_html=True)
+
+    if "instruction_text" not in st.session_state:
+        st.session_state.instruction_text = EXAMPLE_INSTRUCTION
+    st.caption("Try an example, or write your own below:")
+    chip_cols = st.columns(3)
+    for col, (label, text) in zip(chip_cols, [
+        ("% looking at people", "what percent of time did they look at people"),
+        ("Heatmap of gaze", "give me a heatmap of where they looked"),
+        ("When they looked", "when did they look at the table, give me timestamps"),
+    ]):
+        if col.button(label, width="stretch", key=f"chip_{label}"):
+            st.session_state.instruction_text = text
+
+    instruction = st.text_area("Instruction", key="instruction_text", height=90,
+                                help="Say what to pay attention to (e.g. 'look at the window') and what "
+                                     "output you want (percent, heatmap, how many times, how fast).")
+    ready = video_path is not None and gaze_path is not None and scene is not None
+    run_clicked = st.button("Run analysis", type="primary", width="stretch", disabled=not ready)
+    if not ready and source_mode == "Upload your own files":
+        st.caption("Upload both a video and a gaze CSV to continue.")
+
+st.write("")
+st.subheader("Result")
+if run_clicked:
+    with st.spinner("Analyzing..."):
+        results = run_analysis(str(video_path), str(gaze_path), scene, instruction)
+    if "error" in results:
+        st.error(results["error"])
+    else:
+        for r in results["results"]:
+            render_result(r)
+        # output_json is a path on the server's own disk -- useless to the clinician as
+        # text, so offer its contents as an actual download instead of just naming it.
+        with open(results["output_json"], "rb") as f:
+            st.download_button("Download full result (JSON)", f.read(),
+                                file_name=Path(results["output_json"]).name, mime="application/json")
+else:
+    st.info("Upload a video and gaze file, describe what you want to know, and click **Run analysis**.")
