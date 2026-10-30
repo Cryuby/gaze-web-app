@@ -63,6 +63,15 @@ def available_scenes():
         return []
 
 
+TAG_COLORS = {"blue": ("#E1F3FE", "#1F6C9F"), "green": ("#EDF3EC", "#346538"), "yellow": ("#FBF3DB", "#956400")}
+
+
+def tag(label, color):
+    bg, fg = TAG_COLORS[color]
+    return (f'<span style="background:{bg};color:{fg};padding:2px 9px;border-radius:9999px;'
+            f'font-size:0.68rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">{label}</span>')
+
+
 def render_result(r):
     # "source" (open_vocab/closed_vocab) is an internal implementation detail -- useful in
     # the downloadable JSON, not in the clinician-facing screen, so it's deliberately left
@@ -70,12 +79,12 @@ def render_result(r):
     kind = r.get("kind")
     if kind == "scene_summary":
         with st.container(border=True):
-            st.markdown("🎬 **What happened in the scene**")
+            st.markdown(f'{tag("Scene", "blue")} &nbsp; **What happened**', unsafe_allow_html=True)
             if r.get("scene_description"):
                 st.write(r["scene_description"])
             else:
                 st.caption("Scene description unavailable (TwelveLabs API key not configured on this machine).")
-            st.markdown("👀 **Where they looked**")
+            st.markdown(f'{tag("Gaze", "green")} &nbsp; **Where they looked**', unsafe_allow_html=True)
             st.write(r["gaze_summary"])
     elif kind == "heatmap":
         if "output_png" in r:
@@ -112,46 +121,58 @@ def render_result(r):
 
 st.set_page_config(page_title="Gaze Analysis Tool", page_icon="👁️", layout="wide")
 
-# Lightweight visual polish only -- centered reading width, rounded/shadowed cards, a
-# numbered-badge look for the two steps. `stVerticalBlockBorderWrapper` is Streamlit's
-# internal testid for st.container(border=True); if a future Streamlit version renames
-# it this rule just stops applying (containers still render fine, plain-bordered).
+# Warm-monochrome, editorial-minimal pass: flat 1px borders instead of shadows, a serif
+# display face for the title only, muted pastel tags instead of emoji, restrained charcoal
+# CTA. `stVerticalBlockBorderWrapper` is Streamlit's internal testid for
+# st.container(border=True); if a future Streamlit version renames it this rule just stops
+# applying (containers still render fine, plain-bordered).
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(160deg, #EEF1FB 0%, #FAFBFF 45%, #FFFFFF 100%);
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500&display=swap');
+
+.stApp { background: #FBFBFA; }
+.block-container { max-width: 1040px; padding-top: 2.4rem; }
+[data-testid="stAppViewContainer"] h1 {
+    font-family: 'Newsreader', serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #2F3437;
 }
-.block-container { max-width: 1100px; padding-top: 2.2rem; }
 [data-testid="stVerticalBlockBorderWrapper"] {
     background: #FFFFFF;
-    border-radius: 14px !important;
-    box-shadow: 0 1px 3px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04);
+    border: 1px solid #EAEAEA;
+    border-radius: 10px !important;
+    box-shadow: none !important;
 }
-.app-subtitle { color: #5b6274; font-size: 1rem; margin-top: -0.6rem; margin-bottom: 1rem; }
+.app-subtitle { color: #787774; font-size: 1rem; margin-top: -0.6rem; margin-bottom: 1.1rem; }
 .step-heading {
     display: flex; align-items: center; gap: 0.55rem;
-    font-size: 1.05rem; font-weight: 600; margin: 0.2rem 0 0.9rem 0;
+    font-size: 1.02rem; font-weight: 600; color: #2F3437; margin: 0.2rem 0 0.9rem 0;
 }
 .step-heading .num {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 1.55rem; height: 1.55rem; border-radius: 50%;
-    background: #4F6BED; color: white; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: #2F3437; color: #FBFBFA; font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
 }
 .privacy-note {
-    background: #FFF8E8; border: 1px solid #F1D9A0; border-radius: 10px;
-    padding: 0.7rem 1rem; font-size: 0.88rem; color: #6b5a24; margin-bottom: 1.3rem;
+    background: #FBF3DB; border: 1px solid #EDE0B0; border-radius: 10px;
+    padding: 0.7rem 1rem; font-size: 0.85rem; color: #6b5a20; margin-bottom: 1.3rem;
 }
+div[data-testid="stButton"] button[kind="primary"] {
+    background: #2F3437; border: none; border-radius: 6px; box-shadow: none;
+}
+div[data-testid="stButton"] button[kind="primary"]:hover { background: #111111; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("👁️ Gaze Analysis Tool")
+st.title("Gaze Analysis Tool")
 st.markdown('<p class="app-subtitle">Upload a scene video and eye-tracking data, describe what '
             'you want to know in plain language, and get results back -- no install required.</p>',
             unsafe_allow_html=True)
 st.markdown(
-    '<div class="privacy-note">⚠️ <b>Prototype hosted online</b> -- your video and gaze file are '
-    'sent to this server to run the analysis (not kept local like the desktop version). Only use '
-    'de-identified data, or data already cleared for this kind of processing.</div>',
+    f'<div class="privacy-note">{tag("Prototype", "yellow")} &nbsp; Hosted online -- your video and '
+    'gaze file are sent to this server to run the analysis (not kept local like the desktop version). '
+    'Only use de-identified data, or data already cleared for this kind of processing.</div>',
     unsafe_allow_html=True,
 )
 
@@ -177,8 +198,8 @@ with left:
             scene = st.selectbox("Scene", scenes, index=scenes.index("2.1.C") if "2.1.C" in scenes else 0)
             video_path, gaze_path = SCENE_DIR / f"{scene}.mp4", PARTICIPANTS[participant_label]
         else:
-            video_upload = st.file_uploader("🎥 Scene video", type=["mp4", "mov", "avi", "mkv"])
-            gaze_upload = st.file_uploader("📄 Gaze CSV", type=["csv"])
+            video_upload = st.file_uploader("Scene video", type=["mp4", "mov", "avi", "mkv"])
+            gaze_upload = st.file_uploader("Gaze CSV", type=["csv"])
             if video_upload is not None:
                 video_path = save_upload(video_upload)
             if gaze_upload is not None:
@@ -208,12 +229,12 @@ with left:
                                     help="Say what to pay attention to (e.g. 'look at the window') and what "
                                          "output you want (percent, heatmap, how many times, how fast).")
         ready = video_path is not None and gaze_path is not None and scene is not None
-        run_clicked = st.button("▶ Run analysis", type="primary", width="stretch", disabled=not ready)
+        run_clicked = st.button("Run analysis", type="primary", width="stretch", disabled=not ready)
         if not ready and source_mode == "Upload your own files":
             st.caption("Upload both a video and a gaze CSV to continue.")
 
 with right:
-    st.subheader("📊 Result")
+    st.subheader("Result")
     if run_clicked:
         with st.spinner("Analyzing..."):
             results = run_analysis(str(video_path), str(gaze_path), scene, instruction)
@@ -225,7 +246,7 @@ with right:
             # output_json is a path on the server's own disk -- useless to the clinician as
             # text, so offer its contents as an actual download instead of just naming it.
             with open(results["output_json"], "rb") as f:
-                st.download_button("⬇ Download full result (JSON)", f.read(),
+                st.download_button("Download full result (JSON)", f.read(),
                                     file_name=Path(results["output_json"]).name, mime="application/json")
     else:
-        st.info("👈 Upload a video and gaze file, describe what you want to know, and click **Run analysis**.")
+        st.info("Upload a video and gaze file, describe what you want to know, and click **Run analysis**.")
