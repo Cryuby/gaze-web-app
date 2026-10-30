@@ -118,8 +118,12 @@ st.set_page_config(page_title="Gaze Analysis Tool", page_icon="👁️", layout=
 # it this rule just stops applying (containers still render fine, plain-bordered).
 st.markdown("""
 <style>
+.stApp {
+    background: linear-gradient(160deg, #EEF1FB 0%, #FAFBFF 45%, #FFFFFF 100%);
+}
 .block-container { max-width: 1100px; padding-top: 2.2rem; }
 [data-testid="stVerticalBlockBorderWrapper"] {
+    background: #FFFFFF;
     border-radius: 14px !important;
     box-shadow: 0 1px 3px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04);
 }
