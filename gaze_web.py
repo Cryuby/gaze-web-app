@@ -64,15 +64,18 @@ def available_scenes():
 
 
 def render_result(r):
+    # "source" (open_vocab/closed_vocab) is an internal implementation detail -- useful in
+    # the downloadable JSON, not in the clinician-facing screen, so it's deliberately left
+    # out of every st.metric/caption below.
     kind = r.get("kind")
     if kind == "scene_summary":
         with st.container(border=True):
-            st.markdown("**What happened in the scene**")
+            st.markdown("🎬 **What happened in the scene**")
             if r.get("scene_description"):
                 st.write(r["scene_description"])
             else:
                 st.caption("Scene description unavailable (TwelveLabs API key not configured on this machine).")
-            st.markdown("**Where they looked**")
+            st.markdown("👀 **Where they looked**")
             st.write(r["gaze_summary"])
     elif kind == "heatmap":
         if "output_png" in r:
@@ -80,16 +83,16 @@ def render_result(r):
         else:
             st.warning(r.get("message", "Could not render heatmap."))
     elif kind == "proportion":
-        st.metric(f"Gaze time on '{r['target']}'", f"{r['pct']:.1f}%", help=f"n={r['n_samples']} samples [{r['source']}]")
+        st.metric(f"Gaze time on '{r['target']}'", f"{r['pct']:.1f}%", help=f"based on {r['n_samples']} gaze samples")
     elif kind == "episodes":
         c1, c2, c3 = st.columns(3)
         c1.metric("Episodes", r["n_episodes"])
         c2.metric("Per minute", f"{r['episodes_per_min']:.1f}")
         c3.metric("Mean duration", f"{r['mean_duration_s']:.2f}s")
-        st.caption(f"Looking at '{r['target']}', mean gap between episodes {r['mean_gap_s']:.2f}s [{r['source']}]")
+        st.caption(f"Looking at '{r['target']}', mean gap between episodes {r['mean_gap_s']:.2f}s")
     elif kind == "timestamps":
         if r.get("moments"):
-            st.write(f"{len(r['moments'])} moments looking at '{r['target']}' [{r['source']}]")
+            st.write(f"{len(r['moments'])} moments looking at '{r['target']}'")
             st.dataframe(r["moments"], width="stretch", hide_index=True)
             if r.get("n_filtered_as_noise"):
                 st.caption(f"({r['n_filtered_as_noise']} briefer glances omitted as likely tracking noise)")
@@ -100,7 +103,7 @@ def render_result(r):
             st.warning(f"Never oriented to '{r['target']}' in this scene.")
         else:
             st.metric(f"Time to first look at '{r['target']}'", f"{r['mean_latency_s']:.2f}s",
-                      help=f"hit rate {r['hit_rate']*100:.0f}% [{r['source']}]")
+                      help=f"hit rate {r['hit_rate']*100:.0f}%")
     elif kind == "unsupported":
         st.warning(r["message"])
     else:
@@ -109,11 +112,44 @@ def render_result(r):
 
 st.set_page_config(page_title="Gaze Analysis Tool", page_icon="👁️", layout="wide")
 
+# Lightweight visual polish only -- centered reading width, rounded/shadowed cards, a
+# numbered-badge look for the two steps. `stVerticalBlockBorderWrapper` is Streamlit's
+# internal testid for st.container(border=True); if a future Streamlit version renames
+# it this rule just stops applying (containers still render fine, plain-bordered).
+st.markdown("""
+<style>
+.block-container { max-width: 1100px; padding-top: 2.2rem; }
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 14px !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04);
+}
+.app-subtitle { color: #5b6274; font-size: 1rem; margin-top: -0.6rem; margin-bottom: 1rem; }
+.step-heading {
+    display: flex; align-items: center; gap: 0.55rem;
+    font-size: 1.05rem; font-weight: 600; margin: 0.2rem 0 0.9rem 0;
+}
+.step-heading .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.55rem; height: 1.55rem; border-radius: 50%;
+    background: #4F6BED; color: white; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;
+}
+.privacy-note {
+    background: #FFF8E8; border: 1px solid #F1D9A0; border-radius: 10px;
+    padding: 0.7rem 1rem; font-size: 0.88rem; color: #6b5a24; margin-bottom: 1.3rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("👁️ Gaze Analysis Tool")
-st.caption("⚠️ Prototype hosted online: the video and gaze file you upload are sent to this "
-           "server to run the analysis (not kept local like the desktop version). Only use "
-           "de-identified data, or data already cleared for this kind of processing.")
-st.divider()
+st.markdown('<p class="app-subtitle">Upload a scene video and eye-tracking data, describe what '
+            'you want to know in plain language, and get results back -- no install required.</p>',
+            unsafe_allow_html=True)
+st.markdown(
+    '<div class="privacy-note">⚠️ <b>Prototype hosted online</b> -- your video and gaze file are '
+    'sent to this server to run the analysis (not kept local like the desktop version). Only use '
+    'de-identified data, or data already cleared for this kind of processing.</div>',
+    unsafe_allow_html=True,
+)
 
 scenes = available_scenes()
 has_known_data = bool(scenes)
@@ -122,7 +158,8 @@ left, right = st.columns([1, 1.4], gap="large")
 
 with left:
     with st.container(border=True):
-        st.subheader("1. Choose what to analyze")
+        st.markdown('<div class="step-heading"><span class="num">1</span>Choose what to analyze</div>',
+                    unsafe_allow_html=True)
         if has_known_data:
             source_mode = st.radio("Video + gaze data source", ["Use a known example", "Upload your own files"],
                                     horizontal=True, label_visibility="collapsed")
@@ -136,8 +173,8 @@ with left:
             scene = st.selectbox("Scene", scenes, index=scenes.index("2.1.C") if "2.1.C" in scenes else 0)
             video_path, gaze_path = SCENE_DIR / f"{scene}.mp4", PARTICIPANTS[participant_label]
         else:
-            video_upload = st.file_uploader("Scene video", type=["mp4", "mov", "avi", "mkv"])
-            gaze_upload = st.file_uploader("Gaze CSV", type=["csv"])
+            video_upload = st.file_uploader("🎥 Scene video", type=["mp4", "mov", "avi", "mkv"])
+            gaze_upload = st.file_uploader("📄 Gaze CSV", type=["csv"])
             if video_upload is not None:
                 video_path = save_upload(video_upload)
             if gaze_upload is not None:
@@ -148,8 +185,22 @@ with left:
                 else:
                     st.warning("Couldn't detect a scene name in this gaze file's 'filename' column.")
 
-        st.subheader("2. What do you want to know?")
-        instruction = st.text_area("Instruction", EXAMPLE_INSTRUCTION, height=90,
+        st.markdown('<div class="step-heading"><span class="num">2</span>What do you want to know?</div>',
+                    unsafe_allow_html=True)
+
+        if "instruction_text" not in st.session_state:
+            st.session_state.instruction_text = EXAMPLE_INSTRUCTION
+        st.caption("Try an example, or write your own below:")
+        chip_cols = st.columns(3)
+        for col, (label, text) in zip(chip_cols, [
+            ("% looking at people", "what percent of time did they look at people"),
+            ("Heatmap of gaze", "give me a heatmap of where they looked"),
+            ("When they looked", "when did they look at the table, give me timestamps"),
+        ]):
+            if col.button(label, width="stretch", key=f"chip_{label}"):
+                st.session_state.instruction_text = text
+
+        instruction = st.text_area("Instruction", key="instruction_text", height=90,
                                     help="Say what to pay attention to (e.g. 'look at the window') and what "
                                          "output you want (percent, heatmap, how many times, how fast).")
         ready = video_path is not None and gaze_path is not None and scene is not None
@@ -158,7 +209,7 @@ with left:
             st.caption("Upload both a video and a gaze CSV to continue.")
 
 with right:
-    st.subheader("Result")
+    st.subheader("📊 Result")
     if run_clicked:
         with st.spinner("Analyzing..."):
             results = run_analysis(str(video_path), str(gaze_path), scene, instruction)
@@ -173,4 +224,4 @@ with right:
                 st.download_button("⬇ Download full result (JSON)", f.read(),
                                     file_name=Path(results["output_json"]).name, mime="application/json")
     else:
-        st.info("Pick a participant and scene, enter an instruction, and click **Run analysis**.")
+        st.info("👈 Upload a video and gaze file, describe what you want to know, and click **Run analysis**.")
